@@ -1,25 +1,99 @@
----
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
----
 
+# Personal Activity Monitoring
+#### Girish Doshi
+#### Friday, April 15, 2015
 
-## Loading and preprocessing the data
+### Loading and preprocessing data 
+```{r}
+raw_data <- read.csv("repdata-data-activity/activity.csv")
 
+library(dplyr)
+no_na_data <- raw_data[complete.cases(raw_data), ]
 
+```
 
-## What is mean total number of steps taken per day?
+### What is mean total number of steps  per day?
 
+1 Calculate the total number of steps taken per day
+```{r}
+steps_per_day <- group_by(no_na_data, date) %>% summarise(Total.steps = sum(steps))
+```
 
+2 Histogram of total number of steps taken each day
+```{r}
+hist(steps_per_day$Total.steps, xlab = "Total steps per day", main = "Histogram of Total number of steps each day")
 
-## What is the average daily activity pattern?
+barplot(steps_per_day$Total.steps, main="Total Steps taken per day", names.arg=steps_per_day$date, width=5, xlab = "date", ylab = "No. of steps")
+```
 
+3 The mean and median of the total number of steps taken per day
+```{r}
+summary(steps_per_day)
+```
 
+### What is the average daily activity pattern?
+1 Make a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
 
-## Imputing missing values
+```{r}
+avg_steps_per_interval_accross_all_days <- group_by(no_na_data, interval) %>% 
+                                                summarise(avg.steps = mean(steps))
 
+plot(avg_steps_per_interval_accross_all_days$interval,
+     avg_steps_per_interval_accross_all_days$avg.steps,
+     type="l",
+     xlab="5-minite interval",
+     ylab="Average no. of steps",
+     main= "Average steps taken per 5-minute interval accross all days")
 
+```
 
-## Are there differences in activity patterns between weekdays and weekends?
+2 Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+
+```{r}
+filter(avg_steps_per_interval_accross_all_days, avg.steps == max(avg.steps))
+```
+
+### Imputing missing values
+
+1 Total number of missing values in the 'steps' column in the raw data set
+```{r}
+sum(is.na(raw_data$steps))
+
+```
+
+2 Fill the missing values  
+   We fill missing values with average steps per interval accross all days.
+
+```{r}
+filled_df <- mutate(raw_data, avg.steps = rep(avg_steps_per_interval_accross_all_days$avg.steps, (nrow(raw_data)/length(unique(raw_data$interval)))))  %>% 
+        mutate(steps = ifelse(is.na(steps), avg.steps, steps)) %>% 
+        select(1:3)
+
+```
+
+3 Histogram of total number of steps taken each day
+
+```{r}
+filled_steps_per_day <- group_by(filled_df, date) %>% summarise(Total.steps = sum(steps))
+
+hist(filled_steps_per_day$Total.steps, xlab = "Total steps per day", main = "Histogram of Total number of steps each day")
+
+barplot(filled_steps_per_day$Total.steps, main="NA Values filled \n Total Steps taken per day", names.arg=filled_steps_per_day$date, width=5, xlab = "date", ylab = "No. of steps")
+
+```
+
+4 The mean and median of the total number of steps taken per day
+```{r}
+summary(steps_per_day)
+```
+
+### Are there differences in activity patterns between weekdays and weekends?
+
+```{r}
+data_by_days <- mutate(filled_df, day = factor( weekdays(as.Date(date)) %in% c("Saturday", "Sunday"), labels = c("weekend", "weekday"))) %>% 
+        group_by(day, interval) %>%
+        summarise(avg.steps = mean(steps))
+
+library(lattice)
+xyplot(avg.steps ~ interval | day, data_by_days, layout = c(1, 2), type = "l")
+```
